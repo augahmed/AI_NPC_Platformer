@@ -1,6 +1,9 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const dialog = document.getElementById("dialog");
+const dialogText = document.getElementById("dialogText");
+const dialogForm = document.getElementById("dialogForm");
+const dialogInput = document.getElementById("dialogInput");
 
 const world = {
   gravity: 0.55,
@@ -13,8 +16,6 @@ const keys = {
   right: false,
   jump: false,
   talk: false,
-  choice1: false,
-  choice2: false,
 };
 
 const player = {
@@ -57,6 +58,7 @@ const levels = [
       {
         id: "bartender",
         name: "Bartender",
+        disposition: "warm, playful, and encouraging",
         x: 120,
         y: 274,
         w: 36,
@@ -96,6 +98,7 @@ const levels = [
       {
         id: "miner",
         name: "Miner",
+        disposition: "gruff, practical, but fair",
         x: 150,
         y: 234,
         w: 36,
@@ -118,6 +121,9 @@ let spawnY = 420;
 let gameWon = false;
 let talkTarget = null;
 let dialogOpen = false;
+let awaitingNpc = false;
+let dialogOverrideText = "";
+let dialogOverrideUntil = 0;
 let portal = null;
 let rock = null;
 const inventory = {
@@ -149,6 +155,9 @@ function setLevel(nextIndex, entrySide = "start") {
   gameWon = false;
   talkTarget = null;
   dialogOpen = false;
+  awaitingNpc = false;
+  dialogOverrideText = "";
+  dialogOverrideUntil = 0;
   portal = null;
   rock = null;
   if (levelIndex === 1) {
@@ -157,7 +166,9 @@ function setLevel(nextIndex, entrySide = "start") {
   if (levelIndex === 3) {
     rock = { x: 610, y: 220, w: 120, h: 120, blocking: !inventory.pickaxe };
   }
-  dialog.textContent = "";
+  dialogText.textContent = "";
+  dialog.classList.add("is-empty");
+  dialogForm.classList.remove("is-open");
 }
 
 function rectsOverlap(a, b) {
@@ -272,9 +283,24 @@ function updateNPCs() {
 
 function updateDialog() {
   if (gameWon) {
-    dialog.textContent = "Goal reached! Refresh to play again.";
+    dialogText.textContent = "Goal reached! Refresh to play again.";
+    dialogForm.classList.remove("is-open");
+    dialog.classList.remove("is-empty");
     return;
   }
+
+  if (dialogOverrideText && performance.now() < dialogOverrideUntil) {
+    dialogText.textContent = dialogOverrideText;
+    dialogForm.classList.remove("is-open");
+    dialog.classList.remove("is-empty");
+    return;
+  }
+
+  if (dialogOverrideText && performance.now() >= dialogOverrideUntil) {
+    dialogOverrideText = "";
+    dialogOverrideUntil = 0;
+  }
+
   const nearby = npcs.find((npc) => {
     const distX = Math.abs(player.x + player.w / 2 - (npc.x + npc.w / 2));
     const distY = Math.abs(player.y + player.h / 2 - (npc.y + npc.h / 2));
@@ -285,11 +311,18 @@ function updateDialog() {
     if (nearby && keys.talk) {
       dialogOpen = true;
       talkTarget = nearby;
+      dialogInput.value = "";
+      dialogForm.classList.add("is-open");
+      dialogInput.focus();
     } else if (nearby) {
-      dialog.textContent = `${nearby.name} looks ready to talk. Press E.`;
+      dialogText.textContent = `${nearby.name} looks ready to talk. Press E.`;
+      dialogForm.classList.remove("is-open");
+      dialog.classList.remove("is-empty");
       return;
     } else {
-      dialog.textContent = "";
+      dialogText.textContent = "";
+      dialogForm.classList.remove("is-open");
+      dialog.classList.add("is-empty");
       talkTarget = null;
       return;
     }
@@ -297,47 +330,39 @@ function updateDialog() {
 
   if (!talkTarget) {
     dialogOpen = false;
-    dialog.textContent = "";
+    dialogText.textContent = "";
+    dialogForm.classList.remove("is-open");
+    dialog.classList.add("is-empty");
     return;
   }
 
+  if (awaitingNpc) {
+    dialogText.textContent = `${talkTarget.name} is thinking...`;
+    dialogForm.classList.remove("is-open");
+    dialog.classList.remove("is-empty");
+    return;
+  }
+
+  const hint = " Type your response and press Enter. Esc to cancel.";
+
   if (talkTarget.id === "bartender") {
     if (inventory.key) {
-      dialog.textContent = `${talkTarget.name}: You already have the key. [2] Leave`;
+      dialogText.textContent = `${talkTarget.name}: You already have the key. Anything else?${hint}`;
     } else {
-      dialog.textContent = `${talkTarget.name}: ${talkTarget.message} [1] Yes, give me a key. [2] No thanks.`;
+      dialogText.textContent = `${talkTarget.name}: ${talkTarget.message}${hint}`;
     }
   } else if (talkTarget.id === "miner") {
     if (inventory.pickaxe) {
-      dialog.textContent = `${talkTarget.name}: Keep that pickaxe safe. [2] Leave`;
+      dialogText.textContent = `${talkTarget.name}: Keep that pickaxe safe. Need something else?${hint}`;
     } else {
-      dialog.textContent = `${talkTarget.name}: ${talkTarget.message} [1] Yes, give me a pickaxe. [2] Not now.`;
+      dialogText.textContent = `${talkTarget.name}: ${talkTarget.message}${hint}`;
     }
   } else {
-    dialog.textContent = `${talkTarget.name}: ${talkTarget.message} [2] Leave`;
+    dialogText.textContent = `${talkTarget.name}: ${talkTarget.message}${hint}`;
   }
 
-  if (keys.choice1) {
-    if (talkTarget.id === "bartender" && !inventory.key) {
-      inventory.key = true;
-      if (portal) portal.locked = false;
-      dialog.textContent = "You received a key. The portal unlocks.";
-    }
-    if (talkTarget.id === "miner" && !inventory.pickaxe) {
-      inventory.pickaxe = true;
-      if (rock) rock.blocking = false;
-      dialog.textContent = "You received a pickaxe. The rock crumbles.";
-    }
-    keys.choice1 = false;
-    dialogOpen = false;
-    talkTarget = null;
-  }
-  if (keys.choice2) {
-    dialog.textContent = "Maybe later.";
-    keys.choice2 = false;
-    dialogOpen = false;
-    talkTarget = null;
-  }
+  dialogForm.classList.add("is-open");
+  dialog.classList.remove("is-empty");
 }
 
 function drawBackground() {
@@ -489,11 +514,14 @@ window.addEventListener("keydown", (event) => {
     case "E":
       keys.talk = true;
       break;
-    case "1":
-      keys.choice1 = true;
-      break;
-    case "2":
-      keys.choice2 = true;
+    case "Escape":
+      if (dialogOpen && !awaitingNpc) {
+        dialogOverrideText = "Maybe later.";
+        dialogOverrideUntil = performance.now() + 1600;
+        dialogOpen = false;
+        talkTarget = null;
+        dialogForm.classList.remove("is-open");
+      }
       break;
     default:
       break;
@@ -519,15 +547,116 @@ window.addEventListener("keyup", (event) => {
     case "E":
       keys.talk = false;
       break;
-    case "1":
-      keys.choice1 = false;
-      break;
-    case "2":
-      keys.choice2 = false;
-      break;
     default:
       break;
   }
+});
+
+function normalizeText(value) {
+  return value.toLowerCase().replace(/[^a-z0-9\s]/g, " ").trim();
+}
+
+function isAffirmative(text) {
+  const tokens = normalizeText(text).split(/\s+/);
+  const positive = ["yes", "yeah", "yep", "sure", "ok", "okay", "please", "give", "take", "want"];
+  return tokens.some((token) => positive.includes(token));
+}
+
+function isNegative(text) {
+  const tokens = normalizeText(text).split(/\s+/);
+  const negative = ["no", "nah", "nope", "not", "later", "leave"];
+  return tokens.some((token) => negative.includes(token));
+}
+
+function getLocalNpcReply(npc, playerText, outcome) {
+  const tone = npc.disposition || "friendly and neutral";
+  if (outcome === "grant") {
+    return `${npc.name} (${tone}): Fair enough. Here you go.`;
+  }
+  if (outcome === "deny") {
+    return `${npc.name} (${tone}): Not today then. Come back if you change your mind.`;
+  }
+  return `${npc.name} (${tone}): ${playerText.length ? "Interesting." : "Speak up."} What else can I do for you?`;
+}
+
+async function getNpcReply(npc, playerText, outcome) {
+  const endpoint = window.NPC_AI_ENDPOINT || "/api/npc-reply";
+
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        npc: {
+          id: npc.id,
+          name: npc.name,
+          disposition: npc.disposition,
+          message: npc.message,
+        },
+        playerText,
+        outcome,
+        inventory: { ...inventory },
+      }),
+    });
+    if (!res.ok) throw new Error("Bad response");
+    const data = await res.json();
+    if (typeof data.reply === "string" && data.reply.trim().length) {
+      return `${npc.name}: ${data.reply}`;
+    }
+    return getLocalNpcReply(npc, playerText, outcome);
+  } catch (err) {
+    return getLocalNpcReply(npc, playerText, outcome);
+  }
+}
+
+async function handlePlayerResponse(playerText) {
+  if (!talkTarget || awaitingNpc) return;
+  const target = talkTarget;
+  awaitingNpc = true;
+
+  let outcome = "neutral";
+  if (target.id === "bartender" && !inventory.key) {
+    if (isAffirmative(playerText)) {
+      inventory.key = true;
+      if (portal) portal.locked = false;
+      outcome = "grant";
+    } else if (isNegative(playerText)) {
+      outcome = "deny";
+    }
+  }
+
+  if (target.id === "miner" && !inventory.pickaxe) {
+    if (isAffirmative(playerText)) {
+      inventory.pickaxe = true;
+      if (rock) rock.blocking = false;
+      outcome = "grant";
+    } else if (isNegative(playerText)) {
+      outcome = "deny";
+    }
+  }
+
+  const reply = await getNpcReply(target, playerText, outcome);
+  const bonus =
+    outcome === "grant" && target.id === "bartender"
+      ? " You received a key. The portal unlocks."
+      : outcome === "grant" && target.id === "miner"
+        ? " You received a pickaxe. The rock crumbles."
+        : "";
+
+  dialogOverrideText = `${reply}${bonus}`;
+  dialogOverrideUntil = performance.now() + 2400;
+  dialogOpen = false;
+  awaitingNpc = false;
+  talkTarget = null;
+  dialogForm.classList.remove("is-open");
+}
+
+dialogForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const text = dialogInput.value.trim();
+  if (!text) return;
+  dialogInput.value = "";
+  handlePlayerResponse(text);
 });
 
 setLevel(0, "start");

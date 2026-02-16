@@ -10,10 +10,22 @@
     <div class="frame">
       <header class="hud">
         <div class="title">AI NPC Platformer</div>
-        <div class="tips">Move: Arrows or A/D · Jump: Space · Talk: E · Choose: 1 or 2</div>
+        <div class="tips">Move: Arrows or A/D · Jump: Space · Talk: E · Respond: type + Enter</div>
       </header>
       <canvas id="game" width="960" height="540"></canvas>
-      <div id="dialog" class="dialog" aria-live="polite"></div>
+      <div id="dialog" class="dialog" aria-live="polite">
+        <div id="dialogText" class="dialog-text"></div>
+        <form id="dialogForm" class="dialog-form" autocomplete="off">
+          <input
+            id="dialogInput"
+            type="text"
+            name="playerResponse"
+            placeholder="Type your response..."
+            maxlength="140"
+          />
+          <button type="submit">Send</button>
+        </form>
+      </div>
     </div>
     <script src="game.js"></script>
   </body>

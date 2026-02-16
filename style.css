@@ -73,8 +73,53 @@ body {
   transition: opacity 0.2s ease;
 }
 
-.dialog:empty {
+.dialog:empty,
+.dialog.is-empty {
   opacity: 0.4;
+}
+
+.dialog-text {
+  min-height: 20px;
+  white-space: pre-wrap;
+}
+
+.dialog-form {
+  margin-top: 10px;
+  display: none;
+  gap: 8px;
+  align-items: center;
+}
+
+.dialog-form.is-open {
+  display: flex;
+}
+
+.dialog-form input {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #d9c3a6;
+  font-size: 14px;
+  background: #fffdf8;
+}
+
+.dialog-form input:focus {
+  outline: 2px solid #e9b77f;
+  border-color: #e9b77f;
+}
+
+.dialog-form button {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #b97b54;
+  background: #e26d5a;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dialog-form button:hover {
+  background: #c45848;
 }
 
 @media (max-width: 700px) {
